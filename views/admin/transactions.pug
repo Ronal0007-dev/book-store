@@ -19,22 +19,29 @@ block content
       tbody
         tr
           td(colspan="8") Loading...
+  #txPagination.pagination-wrap
 
 block scripts
   script.
-    let allPayments = [];
+    let currentPage = 1;
+    let searchTimeout = null;
 
-    async function loadTransactions() {
-      const res = await fetch('/api/admin/transactions', { credentials: 'include' });
+    async function loadTransactions(page) {
+      currentPage = page || 1;
+      const q = document.getElementById('searchBox').value.trim();
+      const params = new URLSearchParams({ page: currentPage, limit: 10 });
+      if (q) params.set('q', q);
+
+      const res = await fetch('/api/admin/transactions?' + params.toString(), { credentials: 'include' });
       const data = await res.json();
-      allPayments = data.payments || [];
-      render(allPayments);
+      render(data.payments || [], data.pagination);
     }
 
-    function render(payments) {
+    function render(payments, pagination) {
       const tbody = document.querySelector('#txTable tbody');
       if (payments.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8">No transactions yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8">No transactions found.</td></tr>';
+        renderPagination(document.getElementById('txPagination'), null, () => {});
         return;
       }
       tbody.innerHTML = payments.map(p => `
@@ -56,10 +63,12 @@ block scripts
         </tr>
       `).join('');
 
+      renderPagination(document.getElementById('txPagination'), pagination, loadTransactions);
+
       document.querySelectorAll('.status-select').forEach(sel => {
         sel.addEventListener('change', async () => {
           if (sel.value === 'success' && !confirm('Mark as SUCCESS? This will immediately grant the user access to everything in this order.')) {
-            loadTransactions();
+            loadTransactions(currentPage);
             return;
           }
           const res = await fetch(`/api/admin/transactions/${sel.dataset.id}`, {
@@ -69,7 +78,7 @@ block scripts
             body: JSON.stringify({ status: sel.value })
           });
           const data = await res.json();
-          if (!data.success) { alert(data.message || 'Could not update.'); loadTransactions(); }
+          if (!data.success) { alert(data.message || 'Could not update.'); loadTransactions(currentPage); }
         });
       });
 
@@ -77,17 +86,14 @@ block scripts
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this transaction record? This does not revoke any access already granted.')) return;
           await fetch(`/api/admin/transactions/${btn.dataset.delTx}`, { method: 'DELETE', credentials: 'include' });
-          loadTransactions();
+          loadTransactions(currentPage);
         });
       });
     }
 
-    document.getElementById('searchBox').addEventListener('input', (e) => {
-      const q = e.target.value.toLowerCase();
-      render(allPayments.filter(p =>
-        (p.User && (p.User.name.toLowerCase().includes(q) || p.User.email.toLowerCase().includes(q))) ||
-        (p.Order && p.Order.orderNumber.toLowerCase().includes(q))
-      ));
+    document.getElementById('searchBox').addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => loadTransactions(1), 350);
     });
 
-    loadTransactions();
+    loadTransactions(1);

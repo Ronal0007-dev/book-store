@@ -1,4 +1,5 @@
 const { sequelize, Book, Exam, Category, User, Order, Payment } = require('../models');
+const { getPagination, buildMeta } = require('../utils/paginate');
 
 // Dashboard summary: counts of books/exams/categories/users + payment totals.
 exports.dashboardStats = async (req, res) => {
@@ -36,36 +37,65 @@ exports.dashboardStats = async (req, res) => {
   }
 };
 
-// All transactions, with basic filtering, for the admin transactions page.
+// All transactions, with basic filtering, for the admin transactions page. Paginated.
 exports.listTransactions = async (req, res) => {
   try {
-    const { status, provider } = req.query;
+    const { status, provider, q } = req.query;
     const where = {};
     if (status) where.status = status;
     if (provider) where.provider = provider;
 
-    const payments = await Payment.findAll({
+    const { Op } = require('sequelize');
+    const userInclude = { model: User, attributes: ['id', 'name', 'email'] };
+    const orderInclude = { model: Order, attributes: ['id', 'orderNumber', 'totalAmount', 'status'] };
+
+    if (q) {
+      // Search across the associated user's name/email or the order number.
+      where[Op.or] = [
+        { '$User.name$': { [Op.like]: `%${q}%` } },
+        { '$User.email$': { [Op.like]: `%${q}%` } },
+        { '$Order.order_number$': { [Op.like]: `%${q}%` } }
+      ];
+    }
+
+    const pagination = getPagination(req.query);
+    const { count, rows } = await Payment.findAndCountAll({
       where,
       order: [['createdAt', 'DESC']],
-      include: [
-        { model: User, attributes: ['id', 'name', 'email'] },
-        { model: Order, attributes: ['id', 'orderNumber', 'totalAmount', 'status'] }
-      ]
+      include: [userInclude, orderInclude],
+      limit: pagination.limit,
+      offset: pagination.offset,
+      subQuery: false, // required so LIMIT/OFFSET work correctly alongside the $association.field$ where clause
+      distinct: true
     });
 
-    return res.json({ success: true, payments });
+    return res.json({ success: true, payments: rows, pagination: buildMeta(pagination, count) });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Could not load transactions.', error: err.message });
   }
 };
 
+// Paginated user list (handles 5,000+ users without loading them all at once).
 exports.listUsers = async (req, res) => {
   try {
-    const users = await User.findAll({
-      attributes: ['id', 'name', 'email', 'phone', 'role', 'isActive', 'createdAt'],
-      order: [['createdAt', 'DESC']]
+    const { q, role } = req.query;
+    const where = {};
+    if (role) where.role = role;
+    if (q) {
+      const { Op } = require('sequelize');
+      where[Op.or] = [{ name: { [Op.like]: `%${q}%` } }, { email: { [Op.like]: `%${q}%` } }];
+    }
+
+    const pagination = getPagination(req.query);
+    const { count, rows } = await User.findAndCountAll({
+      where,
+      attributes: ['id', 'name', 'email', 'phone', 'role', 'authProvider', 'isActive', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+      limit: pagination.limit,
+      offset: pagination.offset
     });
-    return res.json({ success: true, users });
+
+    return res.json({ success: true, users: rows, pagination: buildMeta(pagination, count) });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Could not load users.', error: err.message });
   }
@@ -75,7 +105,7 @@ exports.toggleUserActive = async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-    if (user.role === 'admin') return res.status(400).json({ success: false, message: 'Cannot deactivate an admin account.' });
+    if (user.isAdminOrAbove()) return res.status(400).json({ success: false, message: 'Cannot deactivate an admin account.' });
     await user.update({ isActive: !user.isActive });
     return res.json({ success: true, user: { id: user.id, isActive: user.isActive } });
   } catch (err) {
@@ -83,7 +113,48 @@ exports.toggleUserActive = async (req, res) => {
   }
 };
 
-// --- Full resource management for admin (sees unpublished items too) ---
+// --- Super admin only: manage admin accounts ---
+
+// Creates a brand-new staff admin account. Only a superadmin can do this.
+exports.createAdmin = async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+    if (!name || !email || !password || password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Name, email, and a password (6+ chars) are required.' });
+    }
+
+    const existing = await User.findOne({ where: { email } });
+    if (existing) return res.status(409).json({ success: false, message: 'A user with this email already exists.' });
+
+    const admin = await User.create({ name, email, phone, password, role: 'admin', authProvider: 'local' });
+    return res.status(201).json({ success: true, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not create admin.', error: err.message });
+  }
+};
+
+// Promotes an existing regular user to admin, or demotes an admin back to a
+// regular user. Only a superadmin can do this; superadmin status itself can't
+// be changed here (there's exactly one, seeded at setup).
+exports.setUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'role must be "user" or "admin".' });
+    }
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+    if (user.role === 'superadmin') {
+      return res.status(400).json({ success: false, message: 'The super admin role cannot be changed.' });
+    }
+    await user.update({ role });
+    return res.json({ success: true, user: { id: user.id, role: user.role } });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not update role.', error: err.message });
+  }
+};
+
+// --- Full resource management for admin (sees unpublished items too). Paginated. ---
 
 exports.listAllBooks = async (req, res) => {
   try {
@@ -93,8 +164,16 @@ exports.listAllBooks = async (req, res) => {
       const { Op } = require('sequelize');
       where.title = { [Op.like]: `%${q}%` };
     }
-    const books = await Book.findAll({ where, include: [{ model: Category, attributes: ['id', 'name'] }], order: [['createdAt', 'DESC']] });
-    return res.json({ success: true, books });
+    const pagination = getPagination(req.query);
+    const { count, rows } = await Book.findAndCountAll({
+      where,
+      include: [{ model: Category, attributes: ['id', 'name'] }],
+      order: [['createdAt', 'DESC']],
+      limit: pagination.limit,
+      offset: pagination.offset,
+      distinct: true
+    });
+    return res.json({ success: true, books: rows, pagination: buildMeta(pagination, count) });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Could not load books.', error: err.message });
   }
@@ -118,8 +197,16 @@ exports.listAllExams = async (req, res) => {
       const { Op } = require('sequelize');
       where.title = { [Op.like]: `%${q}%` };
     }
-    const exams = await Exam.findAll({ where, include: [{ model: Category, attributes: ['id', 'name'] }], order: [['createdAt', 'DESC']] });
-    return res.json({ success: true, exams });
+    const pagination = getPagination(req.query);
+    const { count, rows } = await Exam.findAndCountAll({
+      where,
+      include: [{ model: Category, attributes: ['id', 'name'] }],
+      order: [['createdAt', 'DESC']],
+      limit: pagination.limit,
+      offset: pagination.offset,
+      distinct: true
+    });
+    return res.json({ success: true, exams: rows, pagination: buildMeta(pagination, count) });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Could not load exams.', error: err.message });
   }

@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { Category, Book, Exam, Purchase } = require('../../models');
 const { optionalAuthenticate, authenticateWeb, requireAdminWeb } = require('../../middleware/auth');
+const { getPagination, buildMeta } = require('../../utils/paginate');
 
 // Every server-rendered page gets the current exam categories available so the
 // layout can render a dynamic level/category strip (admin-created, not hardcoded).
@@ -42,29 +43,60 @@ router.get('/', optionalAuthenticate, async (req, res) => {
 
 router.get('/login', optionalAuthenticate, (req, res) => {
   if (req.user) return res.redirect('/');
-  res.render('login', { user: null });
+  res.render('login', { user: null, googleClientId: process.env.GOOGLE_CLIENT_ID || null });
 });
 
 router.get('/register', optionalAuthenticate, (req, res) => {
   if (req.user) return res.redirect('/');
-  res.render('register', { user: null });
+  res.render('register', { user: null, googleClientId: process.env.GOOGLE_CLIENT_ID || null });
 });
 
-// --- Browse (public metadata) ---
+router.get('/forgot-password', optionalAuthenticate, (req, res) => {
+  if (req.user) return res.redirect('/');
+  res.render('forgot-password', { user: null });
+});
+
+router.get('/reset-password', optionalAuthenticate, (req, res) => {
+  if (req.user) return res.redirect('/');
+  const { token, email } = req.query;
+  res.render('reset-password', { user: null, token: token || '', email: email || '' });
+});
+
+// --- Browse (public metadata), paginated 10/page so 10,000+ resources stay fast ---
 router.get('/books', optionalAuthenticate, async (req, res) => {
   const categories = await Category.findAll({ where: { type: 'book' } });
   const where = { isPublished: true };
   if (req.query.categoryId) where.categoryId = req.query.categoryId;
-  const books = await Book.findAll({ where, include: [Category], order: [['createdAt', 'DESC']] });
-  res.render('books', { user: req.user || null, books, categories, selectedCategory: req.query.categoryId || '' });
+
+  const pagination = getPagination(req.query);
+  const { count, rows: books } = await Book.findAndCountAll({
+    where, include: [Category], order: [['createdAt', 'DESC']],
+    limit: pagination.limit, offset: pagination.offset, distinct: true
+  });
+
+  res.render('books', {
+    user: req.user || null, books, categories,
+    selectedCategory: req.query.categoryId || '',
+    pageMeta: buildMeta(pagination, count)
+  });
 });
 
 router.get('/exams', optionalAuthenticate, async (req, res) => {
   const categories = await Category.findAll({ where: { type: 'exam' } });
   const where = { isPublished: true };
   if (req.query.categoryId) where.categoryId = req.query.categoryId;
-  const exams = await Exam.findAll({ where, include: [Category], order: [['createdAt', 'DESC']] });
-  res.render('exams', { user: req.user || null, exams, categories, selectedCategory: req.query.categoryId || '' });
+
+  const pagination = getPagination(req.query);
+  const { count, rows: exams } = await Exam.findAndCountAll({
+    where, include: [Category], order: [['createdAt', 'DESC']],
+    limit: pagination.limit, offset: pagination.offset, distinct: true
+  });
+
+  res.render('exams', {
+    user: req.user || null, exams, categories,
+    selectedCategory: req.query.categoryId || '',
+    pageMeta: buildMeta(pagination, count)
+  });
 });
 
 // --- Individual resource pages: registration/login required to view ---
@@ -82,6 +114,23 @@ router.get('/exams/:id', authenticateWeb, async (req, res) => {
   const purchase = await Purchase.findOne({ where: { userId: req.user.id, itemType: 'exam', itemId: exam.id } });
   const owned = purchase ? purchase.hasActiveAccess() : false;
   res.render('exam-detail', { user: req.user, exam, owned });
+});
+
+// --- Protected in-browser reader: only reachable if the user actually owns the resource ---
+router.get('/books/:id/read', authenticateWeb, async (req, res) => {
+  const book = await Book.findByPk(req.params.id);
+  if (!book) return res.status(404).render('404', { user: req.user });
+  const purchase = await Purchase.findOne({ where: { userId: req.user.id, itemType: 'book', itemId: book.id } });
+  if (!purchase || !purchase.hasActiveAccess()) return res.status(403).render('403', { user: req.user });
+  res.render('reader', { user: req.user, title: book.title, streamUrl: `/api/books/${book.id}/stream` });
+});
+
+router.get('/exams/:id/read', authenticateWeb, async (req, res) => {
+  const exam = await Exam.findByPk(req.params.id);
+  if (!exam) return res.status(404).render('404', { user: req.user });
+  const purchase = await Purchase.findOne({ where: { userId: req.user.id, itemType: 'exam', itemId: exam.id } });
+  if (!purchase || !purchase.hasActiveAccess()) return res.status(403).render('403', { user: req.user });
+  res.render('reader', { user: req.user, title: exam.title, streamUrl: `/api/exams/${exam.id}/stream` });
 });
 
 router.get('/cart', authenticateWeb, (req, res) => {
@@ -142,7 +191,7 @@ router.get('/admin/transactions', authenticateWeb, requireAdminWeb, (req, res) =
 });
 
 router.get('/admin/users', authenticateWeb, requireAdminWeb, (req, res) => {
-  res.render('admin/users', { user: req.user, title: 'Users', active: 'users' });
+  res.render('admin/users', { user: req.user, title: 'Users', active: 'users', isSuperAdmin: req.user.isSuperAdmin() });
 });
 
 module.exports = router;

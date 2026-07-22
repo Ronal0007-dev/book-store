@@ -58,8 +58,15 @@ async function optionalAuthenticate(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || !req.user.isAdminOrAbove()) {
     return res.status(403).json({ success: false, message: 'Admin access required.' });
+  }
+  next();
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (!req.user || !req.user.isSuperAdmin()) {
+    return res.status(403).json({ success: false, message: 'Super admin access required.' });
   }
   next();
 }
@@ -91,8 +98,21 @@ async function authenticateWeb(req, res, next) {
 }
 
 function requireAdminWeb(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') return res.status(403).render('403', { user: req.user || null });
+  if (!req.user || !req.user.isAdminOrAbove()) return res.status(403).render('403', { user: req.user || null });
   next();
 }
 
-module.exports = { authenticate, optionalAuthenticate, requireAdmin, authenticateWeb, requireAdminWeb };
+function requireSuperAdminWeb(req, res, next) {
+  if (!req.user || !req.user.isSuperAdmin()) return res.status(403).render('403', { user: req.user || null });
+  next();
+}
+
+module.exports = {
+  authenticate,
+  optionalAuthenticate,
+  requireAdmin,
+  requireSuperAdmin,
+  authenticateWeb,
+  requireAdminWeb,
+  requireSuperAdminWeb
+};

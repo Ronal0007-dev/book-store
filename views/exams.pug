@@ -1,5 +1,7 @@
 extends layout
 
+include mixins/pagination
+
 block content
   section.section
     .section-head
@@ -24,5 +26,8 @@ block content
             p.price TZS #{exam.price}
       if exams.length === 0
         p.muted No past papers found for this filter.
+
+    +paginationLinks(pageMeta, `/exams?${selectedCategory ? 'categoryId=' + selectedCategory + '&' : ''}`)
+
     if !user
       p.notice 🔒 #[a(href="/register") Create a free account] to open any past paper's page and unlock the file after payment.

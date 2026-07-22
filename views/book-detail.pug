@@ -19,7 +19,7 @@ block content
           p.price Rent (#{book.rentDurationDays} days): TZS #{book.rentPrice}
 
         if owned
-          a.btn.btn-primary(href=`/api/books/${book.id}/download`) ⬇ Download / Open
+          a.btn.btn-primary(href=`/books/${book.id}/read`) 📖 Read Now (Protected)
         else
           .actions
             button.btn.btn-primary(data-add-cart data-type="book" data-id=book.id data-access="buy") Add to Cart — Buy

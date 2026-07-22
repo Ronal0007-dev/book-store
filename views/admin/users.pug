@@ -1,6 +1,28 @@
 extends layout
 
 block content
+  if isSuperAdmin
+    .admin-toolbar
+      h2(style="margin:0;font-size:1rem;") Create Admin Account
+    form#createAdminForm.form
+      .form-group
+        label Full name
+        input#a_name(type="text" required)
+      .form-group
+        label Email
+        input#a_email(type="email" required)
+      .form-group
+        label Phone (optional)
+        input#a_phone(type="tel")
+      .form-group
+        label Temporary password
+        input#a_password(type="text" minlength="6" required)
+      p#createAdminMsg.success-text
+      button.btn.btn-primary(type="submit") Create Admin
+
+  .admin-toolbar
+    input.search-box#searchBox(type="text" placeholder="Search by name or email...")
+
   .table-wrap
     table.table#usersTable
       thead
@@ -9,33 +31,122 @@ block content
           th Email
           th Phone
           th Role
+          th Sign-in
           th Active
           th
       tbody
         tr
-          td(colspan="6") Loading...
+          td(colspan="7") Loading...
+  #usersPagination.pagination-wrap
 
 block scripts
   script.
-    async function loadUsers() {
-      const res = await fetch('/api/admin/users', { credentials: 'include' });
+    const isSuperAdmin = #{isSuperAdmin ? 'true' : 'false'};
+    let currentPage = 1;
+    let searchTimeout = null;
+
+    async function loadUsers(page) {
+      currentPage = page || 1;
+      const q = document.getElementById('searchBox').value.trim();
+      const params = new URLSearchParams({ page: currentPage, limit: 10 });
+      if (q) params.set('q', q);
+
+      const res = await fetch('/api/admin/users?' + params.toString(), { credentials: 'include' });
       const data = await res.json();
       const tbody = document.querySelector('#usersTable tbody');
-      tbody.innerHTML = data.users.map(u => `
-        <tr>
-          <td>${u.name}</td>
-          <td>${u.email}</td>
-          <td>${u.phone || '-'}</td>
-          <td>${u.role}</td>
-          <td><span class="status-pill ${u.isActive ? 'status-published' : 'status-unpublished'}">${u.isActive ? 'Active' : 'Deactivated'}</span></td>
-          <td>${u.role !== 'admin' ? `<button class="btn btn-small" data-toggle="${u.id}">${u.isActive ? 'Deactivate' : 'Activate'}</button>` : ''}</td>
-        </tr>
-      `).join('');
+
+      if (!data.success || data.users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">No users found.</td></tr>';
+        renderPagination(document.getElementById('usersPagination'), null, () => {});
+        return;
+      }
+
+      tbody.innerHTML = data.users.map(u => {
+        const roleLabel = u.role === 'superadmin' ? 'Super Admin' : (u.role === 'admin' ? 'Admin' : 'User');
+        let actions = '';
+        if (u.role !== 'superadmin') {
+          if (!isSuperAdmin) {
+            actions = u.role === 'user' ? `<button class="btn btn-small" data-toggle="${u.id}">${u.isActive ? 'Deactivate' : 'Activate'}</button>` : '';
+          } else {
+            actions = `
+              ${u.role === 'user' ? `<button class="btn btn-small btn-secondary" data-promote="${u.id}">Make Admin</button>` : ''}
+              ${u.role === 'admin' ? `<button class="btn btn-small btn-secondary" data-demote="${u.id}">Remove Admin</button>` : ''}
+              <button class="btn btn-small" data-toggle="${u.id}">${u.isActive ? 'Deactivate' : 'Activate'}</button>
+            `;
+          }
+        }
+        return `
+          <tr>
+            <td>${u.name}</td>
+            <td>${u.email}</td>
+            <td>${u.phone || '-'}</td>
+            <td><span class="status-pill ${u.role === 'user' ? 'status-unpublished' : 'status-published'}">${roleLabel}</span></td>
+            <td>${u.authProvider === 'google' ? '🔵 Google' : '✉️ Email'}</td>
+            <td><span class="status-pill ${u.isActive ? 'status-published' : 'status-unpublished'}">${u.isActive ? 'Active' : 'Deactivated'}</span></td>
+            <td class="row-actions">${actions}</td>
+          </tr>
+        `;
+      }).join('');
+
+      renderPagination(document.getElementById('usersPagination'), data.pagination, loadUsers);
+
       document.querySelectorAll('[data-toggle]').forEach(btn => {
         btn.addEventListener('click', async () => {
           await fetch(`/api/admin/users/${btn.dataset.toggle}/toggle-active`, { method: 'PATCH', credentials: 'include' });
-          loadUsers();
+          loadUsers(currentPage);
+        });
+      });
+      document.querySelectorAll('[data-promote]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Make this user an admin? They will get access to the admin panel.')) return;
+          const res = await fetch(`/api/admin/users/${btn.dataset.promote}/role`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+            body: JSON.stringify({ role: 'admin' })
+          });
+          const d = await res.json();
+          if (!d.success) return alert(d.message || 'Could not update role.');
+          loadUsers(currentPage);
+        });
+      });
+      document.querySelectorAll('[data-demote]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Remove admin access from this user?')) return;
+          const res = await fetch(`/api/admin/users/${btn.dataset.demote}/role`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+            body: JSON.stringify({ role: 'user' })
+          });
+          const d = await res.json();
+          if (!d.success) return alert(d.message || 'Could not update role.');
+          loadUsers(currentPage);
         });
       });
     }
-    loadUsers();
+
+    document.getElementById('searchBox').addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => loadUsers(1), 350);
+    });
+
+    const createAdminForm = document.getElementById('createAdminForm');
+    if (createAdminForm) {
+      createAdminForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const res = await fetch('/api/admin/admins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            name: document.getElementById('a_name').value,
+            email: document.getElementById('a_email').value,
+            phone: document.getElementById('a_phone').value,
+            password: document.getElementById('a_password').value
+          })
+        });
+        const data = await res.json();
+        const msg = document.getElementById('createAdminMsg');
+        msg.textContent = data.success ? 'Admin account created.' : (data.message || 'Could not create admin.');
+        if (data.success) { createAdminForm.reset(); loadUsers(1); }
+      });
+    }
+
+    loadUsers(1);

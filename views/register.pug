@@ -3,6 +3,17 @@ extends layout
 block content
   section.auth-section
     h1 Create your free account
+
+    if googleClientId
+      div#g_id_onload(
+        data-client_id=googleClientId
+        data-callback="handleGoogleCredential"
+        data-auto_prompt="false"
+      )
+      .g_id_signin(data-type="standard" data-shape="pill" data-theme="outline" data-text="signup_with" data-size="large" data-width="320")
+      .auth-divider
+        span or
+
     form#registerForm.form
       .form-group
         label(for="name") Full name
@@ -21,7 +32,23 @@ block content
     p Already have an account? #[a(href="/login") Login here]
 
 block scripts
+  if googleClientId
+    script(src="https://accounts.google.com/gsi/client" async defer)
   script.
+    async function handleGoogleCredential(response) {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = '/';
+      } else {
+        document.getElementById('registerError').textContent = data.message || 'Google sign-in failed';
+      }
+    }
+
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {

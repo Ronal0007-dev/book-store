@@ -1,0 +1,32 @@
+//- Server-rendered pagination links (plain <a> tags, no JS) for SSR list pages.
+//- basePath should already include any other query params plus a trailing
+//- separator, e.g. "/books?categoryId=3&" or "/books?" if there are none.
+mixin paginationLinks(pageMeta, basePath)
+  if pageMeta && pageMeta.totalPages > 1
+    .pagination-wrap
+      .pagination-info= pageMeta.totalItems + ' total · page ' + pageMeta.page + ' of ' + pageMeta.totalPages
+      .pagination-controls
+        if pageMeta.hasPrevPage
+          a.btn.btn-small.btn-secondary(href=`${basePath}page=${pageMeta.page - 1}`) ‹ Prev
+        else
+          button.btn.btn-small.btn-secondary(disabled) ‹ Prev
+        - var start = Math.max(1, pageMeta.page - 2)
+        - var end = Math.min(pageMeta.totalPages, pageMeta.page + 2)
+        if start > 1
+          a.btn.btn-small.pagination-num(href=`${basePath}page=1`) 1
+          if start > 2
+            span.pagination-ellipsis …
+        while start <= end
+          if start === pageMeta.page
+            button.btn.btn-small.pagination-num.active= start
+          else
+            a.btn.btn-small.pagination-num(href=`${basePath}page=${start}`)= start
+          - start++
+        if end < pageMeta.totalPages
+          if end < pageMeta.totalPages - 1
+            span.pagination-ellipsis …
+          a.btn.btn-small.pagination-num(href=`${basePath}page=${pageMeta.totalPages}`)= pageMeta.totalPages
+        if pageMeta.hasNextPage
+          a.btn.btn-small.btn-secondary(href=`${basePath}page=${pageMeta.page + 1}`) Next ›
+        else
+          button.btn.btn-small.btn-secondary(disabled) Next ›

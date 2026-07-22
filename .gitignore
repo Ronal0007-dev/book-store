@@ -7,3 +7,4 @@ public/uploads/covers/*
 !uploads/exams/.gitkeep
 !public/uploads/covers/.gitkeep
 npm-debug.log
+README.md

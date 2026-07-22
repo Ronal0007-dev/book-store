@@ -1,0 +1,58 @@
+/* Distraction-free protected reader: dark chrome, single focused page,
+   no native browser PDF controls (no built-in print/save/download button
+   exists because we render via canvas, not an <iframe>/<embed> PDF viewer). */
+
+.reader-body {
+  margin: 0; background: #14181a; color: #e8ecee;
+  font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+
+.reader-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; background: #1c2226; border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.reader-back { color: #9fb3af; font-size: .85rem; font-weight: 600; }
+.reader-back:hover { color: #fff; }
+.reader-title { font-weight: 600; font-size: .95rem; text-align: center; flex: 1; padding: 0 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader-nav { display: flex; align-items: center; gap: 10px; }
+.reader-nav .btn { background: rgba(255,255,255,0.08); color: #fff; border: none; }
+.reader-nav .btn:disabled { opacity: .35; }
+.reader-page-indicator { font-size: .8rem; color: #9fb3af; white-space: nowrap; }
+
+.reader-stage {
+  flex: 1; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;
+  padding: 20px; user-select: none; -webkit-user-select: none;
+}
+.reader-message { color: #9fb3af; margin-top: 60px; font-size: .9rem; }
+.reader-canvas {
+  max-width: 100%; height: auto; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  border-radius: 4px; background: #fff;
+  -webkit-user-drag: none;
+}
+
+.reader-footer {
+  flex-shrink: 0; padding: 10px 20px; background: #1c2226; border-top: 1px solid rgba(255,255,255,0.08);
+}
+.reader-footer p { margin: 0; font-size: .72rem; color: #7d8f8b; text-align: center; }
+
+/* Printing this page (if someone forces it via OS-level print) shows nothing
+   useful - the canvas content is blanked rather than rendered to paper/PDF. */
+@media print {
+  .reader-body * { visibility: hidden !important; }
+  .reader-body::after {
+    content: "Printing is disabled for this content.";
+    visibility: visible; position: fixed; top: 40%; left: 0; right: 0;
+    text-align: center; font-size: 1.2rem; color: #000;
+  }
+}
+
+@media (max-width: 720px) {
+  .reader-topbar { padding: 10px 12px; }
+  .reader-title { font-size: .8rem; }
+  .reader-nav .btn { padding: 8px 10px; }
+  .reader-page-indicator { font-size: .72rem; }
+  .reader-stage { padding: 10px; }
+}

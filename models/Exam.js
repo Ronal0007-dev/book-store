@@ -14,12 +14,19 @@ Exam.init({
   rentDurationDays: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 30 },
   coverImage: { type: DataTypes.STRING, allowNull: true },
   fileUrl: { type: DataTypes.STRING, allowNull: false },
+  conversionStatus: { type: DataTypes.ENUM('not_needed', 'converted', 'failed', 'pending'), defaultValue: 'not_needed' },
   categoryId: { type: DataTypes.INTEGER, allowNull: false },
   uploadedBy: { type: DataTypes.INTEGER, allowNull: false },
   isPublished: { type: DataTypes.BOOLEAN, defaultValue: true }
 }, {
   sequelize,
-  modelName: 'Exam'
+  modelName: 'Exam',
+  indexes: [
+    { fields: ['category_id'] },
+    { fields: ['is_published'] },
+    { fields: ['created_at'] },
+    { fields: ['year_series'] }
+  ]
 });
 
 module.exports = Exam;

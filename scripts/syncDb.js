@@ -1,25 +1,28 @@
 require('dotenv').config();
 const { sequelize, User } = require('../models');
 
-// One-off script: `npm run db:sync` — syncs tables and creates a default
-// admin account (change the password immediately after first login).
+// One-off script: `npm run db:sync` — syncs tables and creates the default
+// SUPER admin account (change the password immediately after first login).
+// The super admin is the only account that can create/promote other admins.
 (async () => {
   try {
     await sequelize.sync({ alter: true });
     console.log('Tables synced.');
 
-    const existingAdmin = await User.findOne({ where: { role: 'admin' } });
-    if (!existingAdmin) {
+    const existingSuperAdmin = await User.findOne({ where: { role: 'superadmin' } });
+    if (!existingSuperAdmin) {
       await User.create({
-        name: 'Administrator',
+        name: 'Super Admin',
         email: 'admin@example.com',
         phone: '255700000000',
         password: 'ChangeMe123!',
-        role: 'admin'
+        role: 'superadmin',
+        authProvider: 'local'
       });
-      console.log('Default admin created: admin@example.com / ChangeMe123! (change this immediately)');
+      console.log('Default SUPER ADMIN created: admin@example.com / ChangeMe123! (change this immediately)');
+      console.log('Sign in with this account, then use Admin -> Users to create additional admin accounts.');
     } else {
-      console.log('An admin account already exists, skipping.');
+      console.log('A super admin account already exists, skipping.');
     }
 
     process.exit(0);

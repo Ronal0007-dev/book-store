@@ -15,6 +15,11 @@ router.post('/login', authLimiter, [
   body('password').notEmpty().withMessage('Password is required')
 ], authController.login);
 
+router.post('/google', authLimiter, authController.googleAuth);
+
+router.post('/forgot-password', authLimiter, authController.forgotPassword);
+router.post('/reset-password', authLimiter, authController.resetPassword);
+
 router.post('/logout', authController.logout);
 router.get('/me', authenticate, authController.me);
 

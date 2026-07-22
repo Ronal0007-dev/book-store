@@ -1,5 +1,7 @@
 extends layout
 
+include mixins/pagination
+
 block content
   section.section
     .section-head
@@ -24,5 +26,8 @@ block content
             p.price TZS #{book.price}
       if books.length === 0
         p.muted No books found for this filter.
+
+    +paginationLinks(pageMeta, `/books?${selectedCategory ? 'categoryId=' + selectedCategory + '&' : ''}`)
+
     if !user
       p.notice 🔒 #[a(href="/register") Create a free account] to open any book's page and unlock the file after payment.

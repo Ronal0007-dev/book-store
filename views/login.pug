@@ -3,6 +3,17 @@ extends layout
 block content
   section.auth-section
     h1 Login
+
+    if googleClientId
+      div#g_id_onload(
+        data-client_id=googleClientId
+        data-callback="handleGoogleCredential"
+        data-auto_prompt="false"
+      )
+      .g_id_signin(data-type="standard" data-shape="pill" data-theme="outline" data-text="continue_with" data-size="large" data-width="320")
+      .auth-divider
+        span or
+
     form#loginForm.form
       .form-group
         label(for="email") Email
@@ -10,12 +21,30 @@ block content
       .form-group
         label(for="password") Password
         input#password(type="password" name="password" required)
+      p.form-forgot
+        a(href="/forgot-password") Forgot your password?
       p#loginError.error-text
-      button.btn.btn-primary(type="submit") Login
+      button.btn.btn-primary#loginBtn(type="submit") Login
     p Don't have an account? #[a(href="/register") Register here]
 
 block scripts
+  if googleClientId
+    script(src="https://accounts.google.com/gsi/client" async defer)
   script.
+    async function handleGoogleCredential(response) {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = new URLSearchParams(window.location.search).get('next') || '/';
+      } else {
+        document.getElementById('loginError').textContent = data.message || 'Google sign-in failed';
+      }
+    }
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('email').value;

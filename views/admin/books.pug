@@ -19,22 +19,29 @@ block content
       tbody
         tr
           td(colspan="7") Loading...
+  #booksPagination.pagination-wrap
 
 block scripts
   script.
-    let allBooks = [];
+    let currentPage = 1;
+    let searchTimeout = null;
 
-    async function loadBooks() {
-      const res = await fetch('/api/admin/books', { credentials: 'include' });
+    async function loadBooks(page) {
+      currentPage = page || 1;
+      const q = document.getElementById('searchBox').value.trim();
+      const params = new URLSearchParams({ page: currentPage, limit: 10 });
+      if (q) params.set('q', q);
+
+      const res = await fetch('/api/admin/books?' + params.toString(), { credentials: 'include' });
       const data = await res.json();
-      allBooks = data.books || [];
-      render(allBooks);
+      render(data.books || [], data.pagination);
     }
 
-    function render(books) {
+    function render(books, pagination) {
       const tbody = document.querySelector('#booksTable tbody');
       if (books.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7">No books found.</td></tr>';
+        renderPagination(document.getElementById('booksPagination'), null, () => {});
         return;
       }
       tbody.innerHTML = books.map(b => `
@@ -53,13 +60,15 @@ block scripts
         </tr>
       `).join('');
 
+      renderPagination(document.getElementById('booksPagination'), pagination, loadBooks);
+
       document.querySelectorAll('[data-del-book]').forEach(btn => {
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this book permanently? This cannot be undone.')) return;
           const res = await fetch(`/api/books/${btn.dataset.delBook}`, { method: 'DELETE', credentials: 'include' });
           const data = await res.json();
           if (!data.success) return alert(data.message || 'Could not delete book.');
-          loadBooks();
+          loadBooks(currentPage);
         });
       });
 
@@ -71,14 +80,14 @@ block scripts
           const res = await fetch(`/api/books/${btn.dataset.togglePub}`, { method: 'PUT', credentials: 'include', body: fd });
           const data = await res.json();
           if (!data.success) return alert(data.message || 'Could not update book.');
-          loadBooks();
+          loadBooks(currentPage);
         });
       });
     }
 
-    document.getElementById('searchBox').addEventListener('input', (e) => {
-      const q = e.target.value.toLowerCase();
-      render(allBooks.filter(b => b.title.toLowerCase().includes(q)));
+    document.getElementById('searchBox').addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => loadBooks(1), 350);
     });
 
-    loadBooks();
+    loadBooks(1);

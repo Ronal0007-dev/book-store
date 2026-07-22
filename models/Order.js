@@ -13,7 +13,12 @@ Order.init({
   paidAt: { type: DataTypes.DATE, allowNull: true }
 }, {
   sequelize,
-  modelName: 'Order'
+  modelName: 'Order',
+  indexes: [
+    { fields: ['user_id'] },
+    { fields: ['status'] },
+    { fields: ['created_at'] }
+  ]
 });
 
 module.exports = Order;

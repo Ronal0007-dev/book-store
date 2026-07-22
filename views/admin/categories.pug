@@ -28,13 +28,24 @@ block content
       tbody
         tr
           td(colspan="5") Loading...
+  #categoriesPagination.pagination-wrap
 
 block scripts
   script.
-    async function loadCategories() {
-      const res = await fetch('/api/categories', { credentials: 'include' });
+    let currentPage = 1;
+
+    async function loadCategories(page) {
+      currentPage = page || 1;
+      const res = await fetch('/api/categories?page=' + currentPage + '&limit=10', { credentials: 'include' });
       const data = await res.json();
       const tbody = document.querySelector('#categoriesTable tbody');
+
+      if (!data.categories || data.categories.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5">No categories yet.</td></tr>';
+        renderPagination(document.getElementById('categoriesPagination'), null, () => {});
+        return;
+      }
+
       tbody.innerHTML = data.categories.map(c => `
         <tr data-row="${c.id}">
           <td class="cell-name">${c.name}</td>
@@ -46,7 +57,9 @@ block scripts
             <button class="btn btn-small btn-danger" data-del-cat="${c.id}">Delete</button>
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="5">No categories yet.</td></tr>';
+      `).join('');
+
+      renderPagination(document.getElementById('categoriesPagination'), data.pagination, loadCategories);
 
       document.querySelectorAll('[data-del-cat]').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -54,7 +67,7 @@ block scripts
           const res = await fetch(`/api/categories/${btn.dataset.delCat}`, { method: 'DELETE', credentials: 'include' });
           const data = await res.json();
           if (!data.success) return alert(data.message || 'Could not delete category.');
-          loadCategories();
+          loadCategories(currentPage);
         });
       });
 
@@ -75,7 +88,7 @@ block scripts
             });
             const data = await res.json();
             if (!data.success) return alert(data.message || 'Could not save.');
-            loadCategories();
+            loadCategories(currentPage);
           });
         });
       });
@@ -95,7 +108,7 @@ block scripts
       });
       const data = await res.json();
       document.getElementById('catMsg').textContent = data.success ? 'Category created.' : (data.message || 'Failed.');
-      if (data.success) { document.getElementById('newCategoryForm').reset(); loadCategories(); }
+      if (data.success) { document.getElementById('newCategoryForm').reset(); loadCategories(1); }
     });
 
-    loadCategories();
+    loadCategories(1);

@@ -1,0 +1,27 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title #{title} &middot; Protected Reader
+    link(rel="stylesheet" href="/css/style.css")
+    link(rel="stylesheet" href="/css/reader.css")
+  body.reader-body
+    header.reader-topbar
+      a.reader-back(href="javascript:history.back()") ← Back
+      span.reader-title= title
+      .reader-nav
+        button#prevPage.btn.btn-small.btn-secondary(disabled) ‹ Prev
+        span#pageIndicator.reader-page-indicator Loading…
+        button#nextPage.btn.btn-small.btn-secondary(disabled) Next ›
+
+    main.reader-stage
+      #readerMessage.reader-message Loading document…
+      canvas#pdfCanvas.reader-canvas(style="display:none")
+
+    .reader-footer
+      p 🔒 This viewer disables right-click, text selection, copying, and printing shortcuts, and pages are watermarked with your account. It cannot block operating-system-level screenshots or screen recording — please respect copyright.
+
+    script(src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha512-3RSrLNIoGdayLzp5R7VF/Ju5vEklWfCK6+4dqLbHM0m4xL/2PZK9ttfIOHmnDh08LTdmT9DsBqk1a0hf1oDl9g==" crossorigin="anonymous" referrerpolicy="no-referrer")
+    script(src="/js/reader.js")
+    script(type="application/json" id="readerConfig")!= JSON.stringify({ streamUrl, userLabel: user.name + ' · ' + user.email }).replace(/</g, '\u003c')

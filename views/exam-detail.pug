@@ -20,7 +20,7 @@ block content
           p.price Rent (#{exam.rentDurationDays} days): TZS #{exam.rentPrice}
 
         if owned
-          a.btn.btn-primary(href=`/api/exams/${exam.id}/download`) ⬇ Download / Open
+          a.btn.btn-primary(href=`/exams/${exam.id}/read`) 📖 Read Now (Protected)
         else
           .actions
             button.btn.btn-primary(data-add-cart data-type="exam" data-id=exam.id data-access="buy") Add to Cart — Buy

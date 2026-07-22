@@ -1,12 +1,15 @@
 const { Category, Book, Exam, sequelize } = require('../models');
+const { getPagination, buildMeta } = require('../utils/paginate');
 
 // Public: list categories, optionally filtered by type=book|exam, with resource counts.
+// Paginated by default; pass ?all=true to get the full list unpaginated (used
+// internally for filter dropdowns and nav menus, where categories are few).
 exports.listCategories = async (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, all } = req.query;
     const where = type ? { type } : {};
 
-    const categories = await Category.findAll({
+    const queryOpts = {
       where,
       attributes: {
         include: [
@@ -27,9 +30,17 @@ exports.listCategories = async (req, res) => {
         ]
       },
       order: [['name', 'ASC']]
-    });
+    };
 
-    return res.json({ success: true, categories });
+    if (all === 'true') {
+      const categories = await Category.findAll(queryOpts);
+      return res.json({ success: true, categories });
+    }
+
+    const pagination = getPagination(req.query);
+    const { count, rows } = await Category.findAndCountAll({ ...queryOpts, limit: pagination.limit, offset: pagination.offset, distinct: true });
+
+    return res.json({ success: true, categories: rows, pagination: buildMeta(pagination, count) });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Could not load categories.', error: err.message });
   }

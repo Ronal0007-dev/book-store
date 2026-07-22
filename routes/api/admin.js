@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const adminController = require('../../controllers/adminController');
-const { authenticate, requireAdmin } = require('../../middleware/auth');
+const { authenticate, requireAdmin, requireSuperAdmin } = require('../../middleware/auth');
 
 router.use(authenticate, requireAdmin);
 
@@ -17,5 +17,9 @@ router.delete('/transactions/:id', adminController.deleteTransaction);
 
 router.get('/users', adminController.listUsers);
 router.patch('/users/:id/toggle-active', adminController.toggleUserActive);
+
+// Super admin only: create staff admin accounts and promote/demote users.
+router.post('/admins', requireSuperAdmin, adminController.createAdmin);
+router.patch('/users/:id/role', requireSuperAdmin, adminController.setUserRole);
 
 module.exports = router;

@@ -82,3 +82,46 @@ async function refreshMobileCartBadge() {
     }
   } catch (err) { /* ignore - non-critical UI enhancement */ }
 }
+
+/**
+ * Renders Prev / page-numbers / Next controls into `container` from a
+ * pagination meta object ({ page, totalPages, hasPrevPage, hasNextPage, totalItems }),
+ * and calls onGoToPage(pageNumber) when the user picks a page. Shared by every
+ * paginated list in the app (admin books/exams/categories/users/transactions,
+ * and the public books/exams/search pages) so the UI and behavior stay consistent.
+ */
+function renderPagination(container, pagination, onGoToPage) {
+  if (!container) return;
+  if (!pagination || pagination.totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const { page, totalPages, hasPrevPage, hasNextPage, totalItems } = pagination;
+
+  // Show a compact window of page numbers around the current page rather than
+  // every page number, which matters once there are hundreds of pages (10,000+ resources / 10 per page).
+  const windowSize = 2;
+  let start = Math.max(1, page - windowSize);
+  let end = Math.min(totalPages, page + windowSize);
+  const pages = [];
+  for (let p = start; p <= end; p++) pages.push(p);
+
+  let html = `<div class="pagination-info">${totalItems} total &middot; page ${page} of ${totalPages}</div><div class="pagination-controls">`;
+  html += `<button class="btn btn-small btn-secondary" data-page="${page - 1}" ${!hasPrevPage ? 'disabled' : ''}>‹ Prev</button>`;
+  if (start > 1) html += `<button class="btn btn-small pagination-num" data-page="1">1</button>${start > 2 ? '<span class="pagination-ellipsis">…</span>' : ''}`;
+  pages.forEach((p) => {
+    html += `<button class="btn btn-small pagination-num ${p === page ? 'active' : ''}" data-page="${p}">${p}</button>`;
+  });
+  if (end < totalPages) html += `${end < totalPages - 1 ? '<span class="pagination-ellipsis">…</span>' : ''}<button class="btn btn-small pagination-num" data-page="${totalPages}">${totalPages}</button>`;
+  html += `<button class="btn btn-small btn-secondary" data-page="${page + 1}" ${!hasNextPage ? 'disabled' : ''}>Next ›</button>`;
+  html += '</div>';
+
+  container.innerHTML = html;
+  container.querySelectorAll('[data-page]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      onGoToPage(parseInt(btn.dataset.page, 10));
+    });
+  });
+}

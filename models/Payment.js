@@ -17,7 +17,14 @@ Payment.init({
   failureReason: { type: DataTypes.STRING, allowNull: true }
 }, {
   sequelize,
-  modelName: 'Payment'
+  modelName: 'Payment',
+  indexes: [
+    { fields: ['order_id'] },
+    { fields: ['user_id'] },
+    { fields: ['status'] },
+    { fields: ['created_at'] },
+    { fields: ['provider_reference'] }
+  ]
 });
 
 module.exports = Payment;

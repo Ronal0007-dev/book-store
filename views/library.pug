@@ -26,7 +26,7 @@ block scripts
           <div class="card-body">
             <h4>${i.title}</h4>
             <p class="muted">${i.accessType === 'rent' ? 'Rented until ' + new Date(i.expiresAt).toLocaleDateString() : 'Purchased — yours forever'}</p>
-            <a class="btn btn-primary" href="/api/${i.itemType}s/${i.itemId}/download">⬇ Download / Open</a>
+            <a class="btn btn-primary" href="/${i.itemType}s/${i.itemId}/read">📖 Read Now (Protected)</a>
           </div>
         </div>
       `).join('');

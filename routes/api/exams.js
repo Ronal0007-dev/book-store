@@ -6,6 +6,7 @@ const upload = require('../../middleware/upload');
 router.get('/', examController.listExams);
 router.get('/:id', authenticate, examController.getExam);
 router.get('/:id/download', authenticate, examController.downloadExam);
+router.get('/:id/stream', authenticate, examController.streamExam);
 
 const resourceUpload = upload.fields([{ name: 'resource', maxCount: 1 }, { name: 'cover', maxCount: 1 }]);
 router.post('/', authenticate, requireAdmin, resourceUpload, examController.createExam);
