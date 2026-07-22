@@ -1,0 +1,38 @@
+extends layout
+
+block content
+  section.section
+    h1 Search results for "#{q}"
+    h2 Past Papers
+    .grid
+      each exam in exams
+        a.card.resource-card(href=`/exams/${exam.id}`)
+          .cover-wrap
+            if exam.coverImage
+              img.cover(src=exam.coverImage alt=exam.title)
+            else
+              .cover-placeholder 📝
+            span.badge-year= exam.yearSeries
+          .card-body
+            h4= exam.title
+            p.muted #{exam.subject || ''} &middot; #{exam.Category ? exam.Category.name : ''}
+            p.price TZS #{exam.price}
+      if exams.length === 0
+        p.muted No past papers matched your search.
+
+    h2 Books
+    .grid
+      each book in books
+        a.card.resource-card(href=`/books/${book.id}`)
+          .cover-wrap
+            if book.coverImage
+              img.cover(src=book.coverImage alt=book.title)
+            else
+              .cover-placeholder 📘
+            span.badge-type BOOK
+          .card-body
+            h4= book.title
+            p.muted= book.Category ? book.Category.name : ''
+            p.price TZS #{book.price}
+      if books.length === 0
+        p.muted No books matched your search.

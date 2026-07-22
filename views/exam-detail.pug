@@ -1,0 +1,30 @@
+extends layout
+
+block content
+  section.detail-section
+    .detail-grid
+      if exam.coverImage
+        img.cover-large(src=exam.coverImage alt=exam.title)
+      else
+        .cover-large-placeholder 📝
+      .detail-info
+        h1= exam.title
+        .detail-tags
+          span.tag= exam.yearSeries
+          if exam.subject
+            span.tag= exam.subject
+          span.tag= exam.Category ? exam.Category.name : 'Exam'
+        p= exam.description || 'No description provided for this past paper.'
+        p.price Buy: TZS #{exam.price}
+        if exam.rentPrice
+          p.price Rent (#{exam.rentDurationDays} days): TZS #{exam.rentPrice}
+
+        if owned
+          a.btn.btn-primary(href=`/api/exams/${exam.id}/download`) ⬇ Download / Open
+        else
+          .actions
+            button.btn.btn-primary(data-add-cart data-type="exam" data-id=exam.id data-access="buy") Add to Cart — Buy
+            if exam.rentPrice
+              button.btn.btn-secondary(data-add-cart data-type="exam" data-id=exam.id data-access="rent") Add to Cart — Rent
+          p#addCartMsg.success-text
+          p.muted 🔒 The file unlocks automatically the moment your M-Pesa / Mixx by Yas payment is confirmed.

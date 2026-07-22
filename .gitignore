@@ -1,0 +1,9 @@
+node_modules/
+.env
+uploads/books/*
+uploads/exams/*
+public/uploads/covers/*
+!uploads/books/.gitkeep
+!uploads/exams/.gitkeep
+!public/uploads/covers/.gitkeep
+npm-debug.log

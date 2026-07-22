@@ -1,0 +1,13 @@
+extends layout
+
+block content
+  section.section
+    h1 Your Cart
+    #cartItems.cart-list
+      p.muted Loading...
+    .cart-summary
+      h3 Total: TZS #[span#cartTotal 0]
+      button#checkoutBtn.btn.btn-primary Proceed to Checkout
+
+block scripts
+  script(src="/js/cart.js")

@@ -1,0 +1,84 @@
+extends layout
+
+block content
+  .admin-toolbar
+    input.search-box#searchBox(type="text" placeholder="Search past papers by title...")
+    a.btn.btn-primary(href="/admin/exams/new") + Upload Exam
+
+  .table-wrap
+    table.table#examsTable
+      thead
+        tr
+          th Cover
+          th Title
+          th Year/Series
+          th Category
+          th Price
+          th Status
+          th
+      tbody
+        tr
+          td(colspan="7") Loading...
+
+block scripts
+  script.
+    let allExams = [];
+
+    async function loadExams() {
+      const res = await fetch('/api/admin/exams', { credentials: 'include' });
+      const data = await res.json();
+      allExams = data.exams || [];
+      render(allExams);
+    }
+
+    function render(exams) {
+      const tbody = document.querySelector('#examsTable tbody');
+      if (exams.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">No past papers found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = exams.map(x => `
+        <tr>
+          <td>${x.coverImage ? `<img class="thumb" src="${x.coverImage}">` : `<div class="thumb-placeholder">📝</div>`}</td>
+          <td>${x.title}</td>
+          <td>${x.yearSeries}</td>
+          <td>${x.Category ? x.Category.name : '-'}</td>
+          <td>TZS ${x.price}</td>
+          <td><span class="status-pill ${x.isPublished ? 'status-published' : 'status-unpublished'}">${x.isPublished ? 'Published' : 'Hidden'}</span></td>
+          <td class="row-actions">
+            <a class="btn btn-small btn-secondary" href="/admin/exams/${x.id}/edit">Edit</a>
+            <button class="btn btn-small" data-toggle-pub="${x.id}" data-pub="${x.isPublished}">${x.isPublished ? 'Unpublish' : 'Publish'}</button>
+            <button class="btn btn-small btn-danger" data-del-exam="${x.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.querySelectorAll('[data-del-exam]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this past paper permanently? This cannot be undone.')) return;
+          const res = await fetch(`/api/exams/${btn.dataset.delExam}`, { method: 'DELETE', credentials: 'include' });
+          const data = await res.json();
+          if (!data.success) return alert(data.message || 'Could not delete exam.');
+          loadExams();
+        });
+      });
+
+      document.querySelectorAll('[data-toggle-pub]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const isPublished = btn.dataset.pub !== 'true';
+          const fd = new FormData();
+          fd.append('isPublished', isPublished);
+          const res = await fetch(`/api/exams/${btn.dataset.togglePub}`, { method: 'PUT', credentials: 'include', body: fd });
+          const data = await res.json();
+          if (!data.success) return alert(data.message || 'Could not update exam.');
+          loadExams();
+        });
+      });
+    }
+
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      render(allExams.filter(x => x.title.toLowerCase().includes(q)));
+    });
+
+    loadExams();

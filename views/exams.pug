@@ -1,0 +1,28 @@
+extends layout
+
+block content
+  section.section
+    .section-head
+      h2 Past Papers
+    form.filter-form(method="GET" action="/exams")
+      select(name="categoryId" onchange="this.form.submit()")
+        option(value="") All levels
+        each cat in categories
+          option(value=cat.id selected=(String(cat.id) === String(selectedCategory)))= cat.name
+    .grid
+      each exam in exams
+        a.card.resource-card(href=`/exams/${exam.id}`)
+          .cover-wrap
+            if exam.coverImage
+              img.cover(src=exam.coverImage alt=exam.title)
+            else
+              .cover-placeholder 📝
+            span.badge-year= exam.yearSeries
+          .card-body
+            h4= exam.title
+            p.muted #{exam.subject || ''} &middot; #{exam.Category ? exam.Category.name : ''}
+            p.price TZS #{exam.price}
+      if exams.length === 0
+        p.muted No past papers found for this filter.
+    if !user
+      p.notice 🔒 #[a(href="/register") Create a free account] to open any past paper's page and unlock the file after payment.

@@ -1,0 +1,54 @@
+extends layout
+
+block content
+  if categories.length === 0
+    p.notice No book categories yet. #[a(href="/admin/categories") Create one first]
+  else
+    form#uploadBookForm.form(enctype="multipart/form-data")
+      .form-group
+        label Title
+        input(type="text" name="title" required)
+      .form-group
+        label Author
+        input(type="text" name="author")
+      .form-group
+        label Category
+        select(name="categoryId" required)
+          each cat in categories
+            option(value=cat.id)= cat.name
+      .form-group
+        label Description
+        textarea(name="description" rows="4")
+      .form-group
+        label Buy price (TZS)
+        input(type="number" name="price" min="0" step="0.01" required)
+      .form-group
+        label Rent price (TZS, optional)
+        input(type="number" name="rentPrice" min="0" step="0.01")
+      .form-group
+        label Rent duration (days)
+        input(type="number" name="rentDurationDays" min="1" value="30")
+      .form-group
+        label Cover image (optional)
+        input(type="file" name="cover" accept="image/*")
+      .form-group
+        label Resource file (PDF/EPUB/DOCX)
+        input(type="file" name="resource" accept=".pdf,.epub,.doc,.docx" required)
+      p#uploadMsg.success-text
+      button.btn.btn-primary(type="submit") Upload
+
+block scripts
+  script.
+    const form = document.getElementById('uploadBookForm');
+    if (form) form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await fetch('/api/books', { method: 'POST', credentials: 'include', body: new FormData(form) });
+      const data = await res.json();
+      const msg = document.getElementById('uploadMsg');
+      if (data.success) {
+        msg.textContent = 'Book uploaded successfully. Redirecting...';
+        setTimeout(() => window.location.href = '/admin/books', 900);
+      } else {
+        msg.textContent = data.message || 'Upload failed.';
+      }
+    });

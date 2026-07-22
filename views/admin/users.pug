@@ -1,0 +1,41 @@
+extends layout
+
+block content
+  .table-wrap
+    table.table#usersTable
+      thead
+        tr
+          th Name
+          th Email
+          th Phone
+          th Role
+          th Active
+          th
+      tbody
+        tr
+          td(colspan="6") Loading...
+
+block scripts
+  script.
+    async function loadUsers() {
+      const res = await fetch('/api/admin/users', { credentials: 'include' });
+      const data = await res.json();
+      const tbody = document.querySelector('#usersTable tbody');
+      tbody.innerHTML = data.users.map(u => `
+        <tr>
+          <td>${u.name}</td>
+          <td>${u.email}</td>
+          <td>${u.phone || '-'}</td>
+          <td>${u.role}</td>
+          <td><span class="status-pill ${u.isActive ? 'status-published' : 'status-unpublished'}">${u.isActive ? 'Active' : 'Deactivated'}</span></td>
+          <td>${u.role !== 'admin' ? `<button class="btn btn-small" data-toggle="${u.id}">${u.isActive ? 'Deactivate' : 'Activate'}</button>` : ''}</td>
+        </tr>
+      `).join('');
+      document.querySelectorAll('[data-toggle]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await fetch(`/api/admin/users/${btn.dataset.toggle}/toggle-active`, { method: 'PATCH', credentials: 'include' });
+          loadUsers();
+        });
+      });
+    }
+    loadUsers();

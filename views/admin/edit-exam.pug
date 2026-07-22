@@ -1,0 +1,81 @@
+extends layout
+
+block content
+  form#editExamForm.form(enctype="multipart/form-data")
+    .form-group
+      label Title
+      input#f_title(type="text" name="title" required)
+    .form-group
+      label Subject
+      input#f_subject(type="text" name="subject")
+    .form-group
+      label Year / Series
+      input#f_yearSeries(type="text" name="yearSeries" required)
+    .form-group
+      label Category
+      select#f_categoryId(name="categoryId" required)
+        each cat in categories
+          option(value=cat.id)= cat.name
+    .form-group
+      label Description
+      textarea#f_description(name="description" rows="4")
+    .form-group
+      label Buy price (TZS)
+      input#f_price(type="number" name="price" min="0" step="0.01" required)
+    .form-group
+      label Rent price (TZS, optional)
+      input#f_rentPrice(type="number" name="rentPrice" min="0" step="0.01")
+    .form-group
+      label Rent duration (days)
+      input#f_rentDurationDays(type="number" name="rentDurationDays" min="1")
+    .form-group
+      label
+        input#f_isPublished(type="checkbox" name="isPublished" style="width:auto;display:inline-block;margin-right:8px;")
+        | Published (visible to users)
+    .form-group
+      label Replace cover image (optional)
+      input(type="file" name="cover" accept="image/*")
+    .form-group
+      label Replace resource file (optional — leave blank to keep current file)
+      input(type="file" name="resource" accept=".pdf,.epub,.doc,.docx")
+    p#editMsg.success-text
+    .actions
+      button.btn.btn-primary(type="submit") Save Changes
+      a.btn.btn-secondary(href="/admin/exams") Cancel
+
+block scripts
+  script.
+    const examId = #{examId};
+
+    async function loadExam() {
+      const res = await fetch(`/api/admin/exams/${examId}`, { credentials: 'include' });
+      const data = await res.json();
+      if (!data.success) { document.getElementById('editMsg').textContent = data.message; return; }
+      const x = data.exam;
+      document.getElementById('f_title').value = x.title || '';
+      document.getElementById('f_subject').value = x.subject || '';
+      document.getElementById('f_yearSeries').value = x.yearSeries || '';
+      document.getElementById('f_categoryId').value = x.categoryId;
+      document.getElementById('f_description').value = x.description || '';
+      document.getElementById('f_price').value = x.price;
+      document.getElementById('f_rentPrice').value = x.rentPrice || '';
+      document.getElementById('f_rentDurationDays').value = x.rentDurationDays || 30;
+      document.getElementById('f_isPublished').checked = !!x.isPublished;
+    }
+
+    document.getElementById('editExamForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      fd.set('isPublished', document.getElementById('f_isPublished').checked);
+      const res = await fetch(`/api/exams/${examId}`, { method: 'PUT', credentials: 'include', body: fd });
+      const data = await res.json();
+      const msg = document.getElementById('editMsg');
+      if (data.success) {
+        msg.textContent = 'Saved.';
+        setTimeout(() => window.location.href = '/admin/exams', 700);
+      } else {
+        msg.textContent = data.message || 'Could not save changes.';
+      }
+    });
+
+    loadExam();

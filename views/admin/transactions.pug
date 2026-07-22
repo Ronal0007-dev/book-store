@@ -1,0 +1,93 @@
+extends layout
+
+block content
+  .admin-toolbar
+    input.search-box#searchBox(type="text" placeholder="Search by user, email or order #...")
+
+  .table-wrap
+    table.table#txTable
+      thead
+        tr
+          th Order
+          th User
+          th Provider
+          th Phone
+          th Amount
+          th Status
+          th Date
+          th
+      tbody
+        tr
+          td(colspan="8") Loading...
+
+block scripts
+  script.
+    let allPayments = [];
+
+    async function loadTransactions() {
+      const res = await fetch('/api/admin/transactions', { credentials: 'include' });
+      const data = await res.json();
+      allPayments = data.payments || [];
+      render(allPayments);
+    }
+
+    function render(payments) {
+      const tbody = document.querySelector('#txTable tbody');
+      if (payments.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8">No transactions yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = payments.map(p => `
+        <tr>
+          <td>${p.Order ? p.Order.orderNumber : '-'}</td>
+          <td>${p.User ? p.User.name + ' (' + p.User.email + ')' : '-'}</td>
+          <td>${p.provider}</td>
+          <td>${p.phone}</td>
+          <td>TZS ${p.amount}</td>
+          <td>
+            <select class="status-select" data-id="${p.id}">
+              ${['initiated','pending','success','failed'].map(s => `<option value="${s}" ${s === p.status ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+          </td>
+          <td>${new Date(p.createdAt).toLocaleString()}</td>
+          <td class="row-actions">
+            <button class="btn btn-small btn-danger" data-del-tx="${p.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.querySelectorAll('.status-select').forEach(sel => {
+        sel.addEventListener('change', async () => {
+          if (sel.value === 'success' && !confirm('Mark as SUCCESS? This will immediately grant the user access to everything in this order.')) {
+            loadTransactions();
+            return;
+          }
+          const res = await fetch(`/api/admin/transactions/${sel.dataset.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ status: sel.value })
+          });
+          const data = await res.json();
+          if (!data.success) { alert(data.message || 'Could not update.'); loadTransactions(); }
+        });
+      });
+
+      document.querySelectorAll('[data-del-tx]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this transaction record? This does not revoke any access already granted.')) return;
+          await fetch(`/api/admin/transactions/${btn.dataset.delTx}`, { method: 'DELETE', credentials: 'include' });
+          loadTransactions();
+        });
+      });
+    }
+
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      render(allPayments.filter(p =>
+        (p.User && (p.User.name.toLowerCase().includes(q) || p.User.email.toLowerCase().includes(q))) ||
+        (p.Order && p.Order.orderNumber.toLowerCase().includes(q))
+      ));
+    });
+
+    loadTransactions();

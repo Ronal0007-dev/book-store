@@ -1,0 +1,45 @@
+extends layout
+
+block content
+  section.auth-section
+    h1 Create your free account
+    form#registerForm.form
+      .form-group
+        label(for="name") Full name
+        input#name(type="text" name="name" required)
+      .form-group
+        label(for="email") Email
+        input#email(type="email" name="email" required)
+      .form-group
+        label(for="phone") Phone (for mobile money payments)
+        input#phone(type="tel" name="phone" placeholder="2557XXXXXXXX")
+      .form-group
+        label(for="password") Password
+        input#password(type="password" name="password" minlength="6" required)
+      p#registerError.error-text
+      button.btn.btn-primary(type="submit") Register
+    p Already have an account? #[a(href="/login") Login here]
+
+block scripts
+  script.
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        password: document.getElementById('password').value
+      };
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = '/';
+      } else {
+        document.getElementById('registerError').textContent =
+          (data.errors && data.errors[0] && data.errors[0].msg) || data.message || 'Registration failed';
+      }
+    });

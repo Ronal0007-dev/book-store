@@ -1,0 +1,28 @@
+extends layout
+
+block content
+  section.section
+    .section-head
+      h2 Books
+    form.filter-form(method="GET" action="/books")
+      select(name="categoryId" onchange="this.form.submit()")
+        option(value="") All categories
+        each cat in categories
+          option(value=cat.id selected=(String(cat.id) === String(selectedCategory)))= cat.name
+    .grid
+      each book in books
+        a.card.resource-card(href=`/books/${book.id}`)
+          .cover-wrap
+            if book.coverImage
+              img.cover(src=book.coverImage alt=book.title)
+            else
+              .cover-placeholder 📘
+            span.badge-type BOOK
+          .card-body
+            h4= book.title
+            p.muted= book.author || (book.Category ? book.Category.name : '')
+            p.price TZS #{book.price}
+      if books.length === 0
+        p.muted No books found for this filter.
+    if !user
+      p.notice 🔒 #[a(href="/register") Create a free account] to open any book's page and unlock the file after payment.

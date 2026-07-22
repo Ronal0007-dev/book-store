@@ -1,0 +1,129 @@
+const path = require('path');
+const fs = require('fs');
+const { Exam, Category, Purchase } = require('../models');
+
+const PUBLIC_ATTRS = ['id', 'title', 'subject', 'yearSeries', 'description', 'price', 'rentPrice', 'rentDurationDays', 'coverImage', 'categoryId', 'createdAt'];
+
+exports.listExams = async (req, res) => {
+  try {
+    const { categoryId, q, yearSeries } = req.query;
+    const where = { isPublished: true };
+    if (categoryId) where.categoryId = categoryId;
+    if (yearSeries) where.yearSeries = yearSeries;
+
+    const { Op } = require('sequelize');
+    if (q) where.title = { [Op.like]: `%${q}%` };
+
+    const exams = await Exam.findAll({
+      where,
+      attributes: PUBLIC_ATTRS,
+      include: [{ model: Category, attributes: ['id', 'name'] }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return res.json({ success: true, exams });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not load exams.', error: err.message });
+  }
+};
+
+exports.getExam = async (req, res) => {
+  try {
+    const exam = await Exam.findOne({
+      where: { id: req.params.id, isPublished: true },
+      attributes: PUBLIC_ATTRS,
+      include: [{ model: Category, attributes: ['id', 'name'] }]
+    });
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found.' });
+
+    const purchase = await Purchase.findOne({ where: { userId: req.user.id, itemType: 'exam', itemId: exam.id } });
+    const owned = purchase ? purchase.hasActiveAccess() : false;
+
+    return res.json({ success: true, exam, owned });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not load exam.', error: err.message });
+  }
+};
+
+exports.downloadExam = async (req, res) => {
+  try {
+    const exam = await Exam.findByPk(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found.' });
+
+    const purchase = await Purchase.findOne({ where: { userId: req.user.id, itemType: 'exam', itemId: exam.id } });
+    if (!purchase || !purchase.hasActiveAccess()) {
+      return res.status(403).json({ success: false, message: 'You have not purchased or rented this exam, or your rental has expired.' });
+    }
+
+    const filePath = path.resolve(exam.fileUrl);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'File is unavailable. Contact support.' });
+    }
+    return res.download(filePath, `${exam.title}${path.extname(filePath)}`);
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not download exam.', error: err.message });
+  }
+};
+
+exports.createExam = async (req, res) => {
+  try {
+    const { title, subject, yearSeries, description, price, rentPrice, rentDurationDays, categoryId } = req.body;
+
+    if (!req.files || !req.files.resource) {
+      return res.status(400).json({ success: false, message: 'A resource file (PDF/EPUB/DOCX) is required.' });
+    }
+
+    const category = await Category.findOne({ where: { id: categoryId, type: 'exam' } });
+    if (!category) return res.status(400).json({ success: false, message: 'Invalid exam category. Create it first.' });
+
+    const exam = await Exam.create({
+      title,
+      subject,
+      yearSeries,
+      description,
+      price,
+      rentPrice: rentPrice || null,
+      rentDurationDays: rentDurationDays || 30,
+      categoryId,
+      uploadedBy: req.user.id,
+      fileUrl: req.files.resource[0].path,
+      coverImage: req.files.cover ? `/uploads/covers/${path.basename(req.files.cover[0].path)}` : null
+    });
+
+    return res.status(201).json({ success: true, exam });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not create exam.', error: err.message });
+  }
+};
+
+exports.updateExam = async (req, res) => {
+  try {
+    const exam = await Exam.findByPk(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found.' });
+
+    const fields = (({ title, subject, yearSeries, description, price, rentPrice, rentDurationDays, categoryId, isPublished }) =>
+      ({ title, subject, yearSeries, description, price, rentPrice, rentDurationDays, categoryId, isPublished }))(req.body);
+
+    Object.keys(fields).forEach((k) => { if (typeof fields[k] === 'undefined') delete fields[k]; });
+    if (typeof fields.isPublished !== 'undefined') fields.isPublished = fields.isPublished === true || fields.isPublished === 'true';
+
+    if (req.files && req.files.resource) fields.fileUrl = req.files.resource[0].path;
+    if (req.files && req.files.cover) fields.coverImage = `/uploads/covers/${path.basename(req.files.cover[0].path)}`;
+
+    await exam.update(fields);
+    return res.json({ success: true, exam });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not update exam.', error: err.message });
+  }
+};
+
+exports.deleteExam = async (req, res) => {
+  try {
+    const exam = await Exam.findByPk(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found.' });
+    await exam.destroy();
+    return res.json({ success: true, message: 'Exam deleted.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Could not delete exam.', error: err.message });
+  }
+};

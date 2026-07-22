@@ -1,0 +1,33 @@
+extends layout
+
+block content
+  section.section
+    h1 My Library
+    p.muted Only resources you have paid for (bought or actively rented) appear here.
+    #libraryItems.grid
+      p.muted Loading...
+
+block scripts
+  script.
+    (async () => {
+      const res = await fetch('/api/library', { credentials: 'include' });
+      const data = await res.json();
+      const el = document.getElementById('libraryItems');
+      if (!data.success || data.items.length === 0) {
+        el.innerHTML = '<p class="muted">You have not purchased or rented anything yet. <a href="/books">Browse books</a> or <a href="/exams">exams</a>.</p>';
+        return;
+      }
+      el.innerHTML = data.items.map(i => `
+        <div class="card resource-card">
+          <div class="cover-wrap">
+            ${i.coverImage ? `<img class="cover" src="${i.coverImage}" alt="${i.title}">` : `<div class="cover-placeholder">${i.itemType === 'book' ? '📘' : '📝'}</div>`}
+            <span class="badge-type">${i.itemType.toUpperCase()}</span>
+          </div>
+          <div class="card-body">
+            <h4>${i.title}</h4>
+            <p class="muted">${i.accessType === 'rent' ? 'Rented until ' + new Date(i.expiresAt).toLocaleDateString() : 'Purchased — yours forever'}</p>
+            <a class="btn btn-primary" href="/api/${i.itemType}s/${i.itemId}/download">⬇ Download / Open</a>
+          </div>
+        </div>
+      `).join('');
+    })();

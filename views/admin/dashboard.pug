@@ -1,0 +1,52 @@
+extends layout
+
+block content
+  .stats-grid#statsGrid
+    p.muted Loading stats...
+
+  h2 Quick actions
+  .actions
+    a.btn.btn-primary(href="/admin/books/new") + Upload Book
+    a.btn.btn-primary(href="/admin/exams/new") + Upload Exam
+    a.btn.btn-secondary(href="/admin/categories") Manage Categories
+
+  h2 Recent Payments
+  .table-wrap
+    table.table#recentPaymentsTable
+      thead
+        tr
+          th User
+          th Provider
+          th Amount
+          th Status
+          th Date
+      tbody
+        tr
+          td(colspan="5") Loading...
+
+block scripts
+  script.
+    (async () => {
+      const res = await fetch('/api/admin/stats', { credentials: 'include' });
+      const data = await res.json();
+      if (!data.success) return;
+      const s = data.stats;
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card"><h3>${s.bookCount}</h3><p>Books</p></div>
+        <div class="stat-card"><h3>${s.examCount}</h3><p>Past Papers</p></div>
+        <div class="stat-card"><h3>${s.categoryCount}</h3><p>Categories</p></div>
+        <div class="stat-card"><h3>${s.userCount}</h3><p>Users</p></div>
+        <div class="stat-card"><h3>${s.paidOrderCount}</h3><p>Paid Orders</p></div>
+        <div class="stat-card"><h3>TZS ${s.totalRevenue}</h3><p>Total Revenue</p></div>
+      `;
+      const tbody = document.querySelector('#recentPaymentsTable tbody');
+      tbody.innerHTML = data.recentPayments.map(p => `
+        <tr>
+          <td>${p.User ? p.User.name : '-'}</td>
+          <td>${p.provider}</td>
+          <td>TZS ${p.amount}</td>
+          <td><span class="status-pill status-${p.status}">${p.status}</span></td>
+          <td>${new Date(p.createdAt).toLocaleString()}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">No payments yet.</td></tr>';
+    })();

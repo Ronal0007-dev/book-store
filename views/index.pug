@@ -1,0 +1,83 @@
+extends layout
+
+block content
+  section.hero
+    h1 Find any book or past paper in seconds
+    p Browse thousands of textbooks and NECTA-style past papers for free. Create an account to unlock any resource instantly with M-Pesa or Mixx by Yas.
+    form.hero-search(action="/search" method="GET")
+      input(type="text" name="q" placeholder="e.g. 'Form Four Physics 2023' or 'Basic Mathematics'")
+      button(type="submit") Search
+    .hero-stats
+      div
+        strong= (latestBooks.length + latestExams.length) + '+'
+        span Resources listed
+      div
+        strong= bookCategories.length
+        span Book categories
+      div
+        strong= examCategories.length
+        span Exam levels
+
+  section.section
+    .section-head
+      h2 Browse by Exam Level
+      a.see-all(href="/exams") See all →
+    .grid
+      each cat in examCategories
+        a.card.category-card(href=`/exams?categoryId=${cat.id}`)
+          h3= cat.name
+          p.muted= cat.description || 'Past papers in this series'
+      if examCategories.length === 0
+        p.muted No exam categories yet. Check back soon.
+
+  section.section
+    .section-head
+      h2 Browse Book Categories
+      a.see-all(href="/books") See all →
+    .grid
+      each cat in bookCategories
+        a.card.category-card(href=`/books?categoryId=${cat.id}`)
+          h3= cat.name
+          p.muted= cat.description || 'Books in this category'
+      if bookCategories.length === 0
+        p.muted No book categories yet. Check back soon.
+
+  section.section
+    .section-head
+      h2 Latest Past Papers
+      a.see-all(href="/exams") See all →
+    .grid
+      each exam in latestExams
+        a.card.resource-card(href=`/exams/${exam.id}`)
+          .cover-wrap
+            if exam.coverImage
+              img.cover(src=exam.coverImage alt=exam.title)
+            else
+              .cover-placeholder 📝
+            span.badge-year= exam.yearSeries
+          .card-body
+            h4= exam.title
+            p.muted= exam.subject || (exam.Category ? exam.Category.name : '')
+            p.price TZS #{exam.price}
+      if latestExams.length === 0
+        p.muted No past papers uploaded yet.
+
+  section.section
+    .section-head
+      h2 Latest Books
+      a.see-all(href="/books") See all →
+    .grid
+      each book in latestBooks
+        a.card.resource-card(href=`/books/${book.id}`)
+          .cover-wrap
+            if book.coverImage
+              img.cover(src=book.coverImage alt=book.title)
+            else
+              .cover-placeholder 📘
+            span.badge-type BOOK
+          .card-body
+            h4= book.title
+            p.muted= book.Category ? book.Category.name : ''
+            p.price TZS #{book.price}
+      if latestBooks.length === 0
+        p.muted No books uploaded yet.

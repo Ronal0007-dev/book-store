@@ -1,0 +1,23 @@
+extends layout
+
+block content
+  section.section.auth-section
+    h1 Checkout
+    div#orderSummary
+      p.muted Loading order...
+    form#payForm.form
+      input#orderId(type="hidden" value=orderId || '')
+      .form-group
+        label Payment provider
+        select#provider(name="provider" required)
+          option(value="mpesa") M-Pesa (Vodacom)
+          option(value="mixbyyas") Mixx by Yas (Tigo)
+      .form-group
+        label Phone number (mobile money)
+        input#phone(type="tel" placeholder="2557XXXXXXXX" required)
+      p#payError.error-text
+      p#payStatus.success-text
+      button.btn.btn-primary(type="submit") Pay now
+
+block scripts
+  script(src="/js/checkout.js")

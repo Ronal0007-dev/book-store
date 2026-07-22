@@ -1,0 +1,101 @@
+extends layout
+
+block content
+  form#newCategoryForm.form
+    .form-group
+      label Name
+      input#catName(type="text" required)
+    .form-group
+      label Type
+      select#catType
+        option(value="book") Book category
+        option(value="exam") Exam year series / level
+    .form-group
+      label Description (optional)
+      input#catDescription(type="text")
+    p#catMsg.success-text
+    button.btn.btn-primary(type="submit") Create Category
+
+  .table-wrap
+    table.table#categoriesTable
+      thead
+        tr
+          th Name
+          th Type
+          th Books
+          th Exams
+          th
+      tbody
+        tr
+          td(colspan="5") Loading...
+
+block scripts
+  script.
+    async function loadCategories() {
+      const res = await fetch('/api/categories', { credentials: 'include' });
+      const data = await res.json();
+      const tbody = document.querySelector('#categoriesTable tbody');
+      tbody.innerHTML = data.categories.map(c => `
+        <tr data-row="${c.id}">
+          <td class="cell-name">${c.name}</td>
+          <td>${c.type}</td>
+          <td>${c.bookCount ?? 0}</td>
+          <td>${c.examCount ?? 0}</td>
+          <td class="row-actions">
+            <button class="btn btn-small btn-secondary" data-edit-cat="${c.id}" data-name="${c.name}">Edit</button>
+            <button class="btn btn-small btn-danger" data-del-cat="${c.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">No categories yet.</td></tr>';
+
+      document.querySelectorAll('[data-del-cat]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this category? It must have no books/exams left in it.')) return;
+          const res = await fetch(`/api/categories/${btn.dataset.delCat}`, { method: 'DELETE', credentials: 'include' });
+          const data = await res.json();
+          if (!data.success) return alert(data.message || 'Could not delete category.');
+          loadCategories();
+        });
+      });
+
+      document.querySelectorAll('[data-edit-cat]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const row = document.querySelector(`tr[data-row="${btn.dataset.editCat}"] .cell-name`);
+          const current = btn.dataset.name;
+          row.innerHTML = `<input type="text" value="${current}" class="edit-cat-input" style="padding:6px;border:1px solid #ccc;border-radius:6px;">
+            <button class="btn btn-small btn-primary" data-save-cat="${btn.dataset.editCat}">Save</button>`;
+          row.querySelector('[data-save-cat]').addEventListener('click', async () => {
+            const newName = row.querySelector('.edit-cat-input').value.trim();
+            if (!newName) return;
+            const res = await fetch(`/api/categories/${btn.dataset.editCat}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ name: newName })
+            });
+            const data = await res.json();
+            if (!data.success) return alert(data.message || 'Could not save.');
+            loadCategories();
+          });
+        });
+      });
+    }
+
+    document.getElementById('newCategoryForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: document.getElementById('catName').value,
+          type: document.getElementById('catType').value,
+          description: document.getElementById('catDescription').value
+        })
+      });
+      const data = await res.json();
+      document.getElementById('catMsg').textContent = data.success ? 'Category created.' : (data.message || 'Failed.');
+      if (data.success) { document.getElementById('newCategoryForm').reset(); loadCategories(); }
+    });
+
+    loadCategories();

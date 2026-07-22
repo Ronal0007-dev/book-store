@@ -1,0 +1,84 @@
+extends layout
+
+block content
+  .admin-toolbar
+    input.search-box#searchBox(type="text" placeholder="Search books by title...")
+    a.btn.btn-primary(href="/admin/books/new") + Upload Book
+
+  .table-wrap
+    table.table#booksTable
+      thead
+        tr
+          th Cover
+          th Title
+          th Category
+          th Price
+          th Rent
+          th Status
+          th
+      tbody
+        tr
+          td(colspan="7") Loading...
+
+block scripts
+  script.
+    let allBooks = [];
+
+    async function loadBooks() {
+      const res = await fetch('/api/admin/books', { credentials: 'include' });
+      const data = await res.json();
+      allBooks = data.books || [];
+      render(allBooks);
+    }
+
+    function render(books) {
+      const tbody = document.querySelector('#booksTable tbody');
+      if (books.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">No books found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = books.map(b => `
+        <tr>
+          <td>${b.coverImage ? `<img class="thumb" src="${b.coverImage}">` : `<div class="thumb-placeholder">📘</div>`}</td>
+          <td>${b.title}</td>
+          <td>${b.Category ? b.Category.name : '-'}</td>
+          <td>TZS ${b.price}</td>
+          <td>${b.rentPrice ? 'TZS ' + b.rentPrice : '-'}</td>
+          <td><span class="status-pill ${b.isPublished ? 'status-published' : 'status-unpublished'}">${b.isPublished ? 'Published' : 'Hidden'}</span></td>
+          <td class="row-actions">
+            <a class="btn btn-small btn-secondary" href="/admin/books/${b.id}/edit">Edit</a>
+            <button class="btn btn-small" data-toggle-pub="${b.id}" data-pub="${b.isPublished}">${b.isPublished ? 'Unpublish' : 'Publish'}</button>
+            <button class="btn btn-small btn-danger" data-del-book="${b.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.querySelectorAll('[data-del-book]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this book permanently? This cannot be undone.')) return;
+          const res = await fetch(`/api/books/${btn.dataset.delBook}`, { method: 'DELETE', credentials: 'include' });
+          const data = await res.json();
+          if (!data.success) return alert(data.message || 'Could not delete book.');
+          loadBooks();
+        });
+      });
+
+      document.querySelectorAll('[data-toggle-pub]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const isPublished = btn.dataset.pub !== 'true';
+          const fd = new FormData();
+          fd.append('isPublished', isPublished);
+          const res = await fetch(`/api/books/${btn.dataset.togglePub}`, { method: 'PUT', credentials: 'include', body: fd });
+          const data = await res.json();
+          if (!data.success) return alert(data.message || 'Could not update book.');
+          loadBooks();
+        });
+      });
+    }
+
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      render(allBooks.filter(b => b.title.toLowerCase().includes(q)));
+    });
+
+    loadBooks();

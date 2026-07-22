@@ -1,0 +1,34 @@
+extends layout
+
+block content
+  section.auth-section
+    h1 Login
+    form#loginForm.form
+      .form-group
+        label(for="email") Email
+        input#email(type="email" name="email" required)
+      .form-group
+        label(for="password") Password
+        input#password(type="password" name="password" required)
+      p#loginError.error-text
+      button.btn.btn-primary(type="submit") Login
+    p Don't have an account? #[a(href="/register") Register here]
+
+block scripts
+  script.
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = new URLSearchParams(window.location.search).get('next') || '/';
+      } else {
+        document.getElementById('loginError').textContent = data.message || 'Login failed';
+      }
+    });
