@@ -49,9 +49,11 @@ block scripts
       const data = await res.json();
       const msg = document.getElementById('uploadMsg');
       if (data.success) {
-        msg.textContent = data.warning ? ('Uploaded with a warning: ' + data.warning) : 'Exam uploaded successfully. Redirecting...';
+        let text = data.warning ? ('Uploaded with a warning: ' + data.warning) : 'Exam uploaded successfully.';
+        if (data.compression) text += ` (File compressed ${data.compression.savedPercent}% smaller.)`;
+        msg.textContent = text + (data.warning ? '' : ' Redirecting...');
         msg.className = data.warning ? 'error-text' : 'success-text';
-        setTimeout(() => window.location.href = '/admin/exams', data.warning ? 2500 : 900);
+        setTimeout(() => window.location.href = '/admin/exams', data.warning ? 3000 : 1200);
       } else {
         msg.className = 'error-text';
         msg.textContent = data.message || 'Upload failed.';

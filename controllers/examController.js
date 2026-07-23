@@ -3,6 +3,7 @@ const fs = require('fs');
 const { Exam, Category, Purchase } = require('../models');
 const { getPagination, buildMeta } = require('../utils/paginate');
 const { convertToPdfIfNeeded } = require('../services/conversionService');
+const { compressPdf, compressImage } = require('../services/compressionService');
 
 const PUBLIC_ATTRS = ['id', 'title', 'subject', 'yearSeries', 'description', 'price', 'rentPrice', 'rentDurationDays', 'coverImage', 'categoryId', 'createdAt'];
 
@@ -116,7 +117,19 @@ exports.createExam = async (req, res) => {
 
     const uploadedPath = req.files.resource[0].path;
     const conversion = await convertToPdfIfNeeded(uploadedPath);
-    const fileUrl = conversion.status === 'converted' ? conversion.outputPath : uploadedPath;
+    let fileUrl = conversion.status === 'converted' ? conversion.outputPath : uploadedPath;
+
+    let pdfCompression = null;
+    if (path.extname(fileUrl).toLowerCase() === '.pdf') {
+      pdfCompression = await compressPdf(fileUrl);
+    }
+
+    let coverImage = null;
+    if (req.files.cover) {
+      const coverPath = req.files.cover[0].path;
+      await compressImage(coverPath);
+      coverImage = `/uploads/covers/${path.basename(coverPath)}`;
+    }
 
     const exam = await Exam.create({
       title,
@@ -130,10 +143,17 @@ exports.createExam = async (req, res) => {
       uploadedBy: req.user.id,
       fileUrl,
       conversionStatus: conversion.status,
-      coverImage: req.files.cover ? `/uploads/covers/${path.basename(req.files.cover[0].path)}` : null
+      coverImage
     });
 
     const response = { success: true, exam };
+    if (pdfCompression && pdfCompression.compressed) {
+      response.compression = {
+        originalSize: pdfCompression.originalSize,
+        newSize: pdfCompression.newSize,
+        savedPercent: Math.round((1 - pdfCompression.newSize / pdfCompression.originalSize) * 100)
+      };
+    }
     if (conversion.status === 'failed') {
       response.warning = `Uploaded, but could not auto-convert to PDF for the protected reader: ${conversion.error} The file was saved as-is; consider uploading a PDF directly.`;
     }
@@ -159,8 +179,15 @@ exports.updateExam = async (req, res) => {
       const conversion = await convertToPdfIfNeeded(uploadedPath);
       fields.fileUrl = conversion.status === 'converted' ? conversion.outputPath : uploadedPath;
       fields.conversionStatus = conversion.status;
+      if (path.extname(fields.fileUrl).toLowerCase() === '.pdf') {
+        await compressPdf(fields.fileUrl);
+      }
     }
-    if (req.files && req.files.cover) fields.coverImage = `/uploads/covers/${path.basename(req.files.cover[0].path)}`;
+    if (req.files && req.files.cover) {
+      const coverPath = req.files.cover[0].path;
+      await compressImage(coverPath);
+      fields.coverImage = `/uploads/covers/${path.basename(coverPath)}`;
+    }
 
     await exam.update(fields);
     return res.json({ success: true, exam });

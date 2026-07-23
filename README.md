@@ -14,6 +14,7 @@ Stack: **Express.js** (API + server-rendered pages), **Pug** (views), **Sequeliz
 - Payment: pick M-Pesa or Mixx by Yas, enter phone number, an STK/USSD push is sent; frontend polls payment status; on provider success the order is marked paid and access (`Purchase`) is auto-granted (permanent for buy, expiring for rent).
 - "My Library" page — shows **only** resources the logged-in user has actually paid for and whose rental (if any) hasn't expired.
 - **Resource auto-conversion**: non-PDF uploads (DOCX/DOC/PPT/PPTX/ODT/RTF/EPUB) are automatically converted to PDF via LibreOffice on upload/edit, so every resource can go through the protected reader.
+- **Automatic compression on upload**: cover images are resized/re-encoded via `sharp` (default: capped at 1000px wide, quality 78), and resource PDFs are recompressed via Ghostscript (default: `/ebook` preset, ~150dpi) — both run automatically on every upload/edit, before the file is ever stored. Tested end-to-end: a 16.7MB cover image compressed to 663KB (96% smaller) and a 7.5MB scanned-style PDF compressed to 253KB (97% smaller), through the real upload API. Compression always keeps whichever version is smaller (original vs. compressed), so it never makes a file bigger.
 - **Protected in-browser reader**: purchased resources open in a distraction-free canvas viewer (not a native browser PDF viewer) with a burned-in watermark of the viewer's name/email/timestamp, disabled right-click/copy/text-selection, and blocked common print/save/devtools keyboard shortcuts. **Read the "Content protection — realistic limits" section below** — this deters casual copying but cannot stop OS-level screenshots.
 - Admin panel (separate layout/nav from the shopper-facing site): full CRUD for categories, books, and exams (view/edit/delete/publish-toggle), a live transactions table (view/edit status/delete), user management, and a dashboard with counts + revenue.
 - **Super admin**: the seeded default account is a `superadmin` — the only role that can create new `admin` accounts or promote/demote a regular user to/from admin. Regular `admin` accounts manage content and transactions but can't manage other admins.
@@ -50,10 +51,15 @@ scripts/syncDb.js            one-off: sync tables + create the default SUPER adm
    ```sql
    CREATE DATABASE book_exam_store CHARACTER SET utf8mb4;
    ```
-2. **(For resource conversion)** Install LibreOffice on the server: `apt-get install libreoffice`
-   (or the smaller `libreoffice-writer libreoffice-impress` subset). Without it, non-PDF
-   uploads are kept as-is and simply can't be opened in the protected reader until
-   re-uploaded as a PDF — the rest of the app still works fine.
+2. **(For resource conversion and compression)** Install LibreOffice and Ghostscript on the
+   server:
+   ```
+   apt-get install libreoffice ghostscript
+   ```
+   Without LibreOffice, non-PDF uploads are kept as-is and can't open in the protected reader
+   until re-uploaded as PDF. Without Ghostscript, PDFs are stored uncompressed. Neither is
+   required for the rest of the app to work — `sharp` (image compression) is a normal npm
+   dependency and needs no separate install.
 3. Copy `.env.example` to `.env` and fill in:
    - DB credentials and a strong `JWT_SECRET`
    - `GOOGLE_CLIENT_ID` if you want "Sign in with Google" (see below)
